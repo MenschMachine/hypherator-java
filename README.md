@@ -23,17 +23,45 @@
 
 ```xml
 <dependency>
-    <groupId>io.sevcik</groupId>
+    <groupId>com.tfc.pdfdancer</groupId>
     <artifactId>hypherator</artifactId>
-    <version>1.0</version>
+    <version>1.1.0-pdfdancer.1</version>
 </dependency>
 ```
 
 ### Gradle
 
-```xml
-implementation("io.sevcik:hypherator:1.0")
+```gradle
+implementation("com.tfc.pdfdancer:hypherator:1.1.0-pdfdancer.1")
 ```
+
+### Publish To TFC Private Maven
+
+The parent POM is configured for `mvn deploy` to the TFC private Maven repository at
+`https://maven-repository.thefamouscat.com/private`.
+
+Add credentials for server id `tfcRepo` in your Maven `settings.xml`, for example:
+
+```xml
+<settings>
+  <servers>
+    <server>
+      <id>tfcRepo</id>
+      <username>${env.TFC_REPO_USER}</username>
+      <password>${env.TFC_REPO_PASSWORD}</password>
+    </server>
+  </servers>
+</settings>
+```
+
+Then publish with:
+
+```bash
+mvn deploy
+```
+
+`hypherator-tools` is build-only and is skipped during deployment. The published artifact is
+`com.tfc.pdfdancer:hypherator`.
 
 ## Usage
 

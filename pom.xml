@@ -31,7 +31,19 @@
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <tfc.repo.url>https://maven-repository.thefamouscat.com/private</tfc.repo.url>
     </properties>
+
+    <distributionManagement>
+        <repository>
+            <id>tfcRepo</id>
+            <url>${tfc.repo.url}</url>
+        </repository>
+        <snapshotRepository>
+            <id>tfcRepo</id>
+            <url>${tfc.repo.url}</url>
+        </snapshotRepository>
+    </distributionManagement>
 
     <modules>
         <module>hypherator-tools</module>
