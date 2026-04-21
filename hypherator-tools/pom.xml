@@ -4,9 +4,9 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <parent>
-        <groupId>io.sevcik</groupId>
+        <groupId>com.tfc.pdfdancer</groupId>
         <artifactId>hypherator-parent</artifactId>
-        <version>1.1</version>
+        <version>1.1.0-pdfdancer.1</version>
     </parent>
     <artifactId>hypherator-tools</artifactId>
     <dependencies>
@@ -47,8 +47,8 @@
                             <arguments>
                                 <argument>${project.basedir}/../dictionaries</argument>
                                 <argument>${project.basedir}/../indic_dictionaries</argument>
-                                <argument>${project.basedir}/../hypherator-core/src/main/resources/3pp_licenses</argument>
-                                <argument>${project.basedir}/../hypherator-core/src/main/resources/hyphen</argument>
+                                <argument>${project.basedir}/../hypherator/src/main/resources/3pp_licenses</argument>
+                                <argument>${project.basedir}/../hypherator/src/main/resources/hyphen</argument>
                             </arguments>
                         </configuration>
                     </execution>

@@ -2,11 +2,13 @@ package io.sevcik.hypherator;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import io.sevcik.hypherator.dto.DictionaryEntry;
+import io.sevcik.hypherator.dto.HyphenationCandidate;
+import io.sevcik.hypherator.dto.HyphenationSplit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -34,22 +36,13 @@ public class Hypherator {
     private static final Logger logger = LoggerFactory.getLogger(Hypherator.class);
     private static final String ALL_JSON_PATH = "/hyphen/all.json";
 
-    private static final Map<String, HyphenDict> dictionaries = new HashMap<>();
-    static {
-        try {
-            Hypherator.loadDictionaries();
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
+    private static final Map<String, DictionaryResource> dictionaryResources = loadDictionaryIndex();
+    private static final Map<String, HyphenDict> dictionaries = new ConcurrentHashMap<>();
 
     /**
-     * Creates a new Hyphenator instance and loads all dictionaries.
-     * 
-     * @throws IOException if there's an error loading the dictionaries
+     * Creates a new Hypherator facade. Dictionaries are loaded lazily on first use.
      */
-    protected Hypherator() throws IOException {
-        loadDictionaries();
+    protected Hypherator() {
     }
 
     /**
@@ -66,12 +59,54 @@ public class Hypherator {
      * </p>
      */
     public static HyphenationIterator getInstance(String locale) {
-        locale = locale.replace('_', '-');
-        HyphenDict dict = dictionaries.get(locale);
+        HyphenDict dict = getOrLoadDictionary(locale);
         if (dict == null) {
             return null;
         }
         return new HyphenationIteratorImpl(dict);
+    }
+
+    /**
+     * Returns all hyphenation candidates for a word in one call.
+     *
+     * @param locale the locale identifier (for example "en-US")
+     * @param word the logical word to hyphenate
+     * @return all break candidates for the word, or an empty list when unavailable
+     */
+    public static List<HyphenationCandidate> hyphenate(String locale, String word) {
+        if (word == null || word.isEmpty()) {
+            return List.of();
+        }
+
+        HyphenDict dict = getOrLoadDictionary(locale);
+        if (dict == null) {
+            return List.of();
+        }
+
+        HyphenateImpl hyphenate = new HyphenateImpl();
+        return hyphenate.hyphenate(dict, word).stream()
+                .map(Hypherator::toCandidate)
+                .toList();
+    }
+
+    /**
+     * Applies a public batch API candidate to a word.
+     *
+     * @param word the original logical word
+     * @param candidate the breakpoint to apply
+     * @return the split text around the break
+     */
+    public static HyphenationSplit applyBreak(String word, HyphenationCandidate candidate) {
+        if (word == null) {
+            throw new IllegalArgumentException("word cannot be null");
+        }
+        if (candidate == null) {
+            throw new IllegalArgumentException("candidate cannot be null");
+        }
+
+        PotentialBreakImpl breakImpl = fromCandidate(candidate);
+        var split = new HyphenateImpl().applyBreak(word, breakImpl);
+        return new HyphenationSplit(split.getFirst(), split.getSecond());
     }
 
 
@@ -92,6 +127,12 @@ public class Hypherator {
      * @throws IOException if there's an error loading the dictionaries
      */
     protected static void loadDictionaries() throws IOException {
+        for (String locale : dictionaryResources.keySet()) {
+            getOrLoadDictionary(locale);
+        }
+    }
+
+    private static Map<String, DictionaryResource> loadDictionaryIndex() {
         try (InputStream is = Hypherator.class.getResourceAsStream(ALL_JSON_PATH)) {
             if (is == null) {
                 throw new IOException("Resource not found: " + ALL_JSON_PATH);
@@ -100,9 +141,8 @@ public class Hypherator {
             ObjectMapper objectMapper = new ObjectMapper();
             List<DictionaryEntry> entries = objectMapper.readValue(is, new TypeReference<List<DictionaryEntry>>() {});
 
-            int dictionaryCount = 0;
+            Map<String, DictionaryResource> resources = new ConcurrentHashMap<>();
             int localeCount = 0;
-
             for (DictionaryEntry entry : entries) {
                 if (entry.getLocations() == null || entry.getLocations().isEmpty() || entry.getLocales() == null || entry.getLocales().isEmpty()) {
                     continue;
@@ -110,25 +150,21 @@ public class Hypherator {
 
                 String location = entry.getLocations().get(0);
                 String resourcePath = "/hyphen/" + location;
-
-                // Load the dictionary using HyphenDictBuilder
-                try {
-                    logger.info("Loading dictionary: {} {}", resourcePath, entry.getLocales());
-                    HyphenDict dict = loadDictionaryFromResource(resourcePath);
-                    dict.hyphen = entry.getHyphen();
-                    dictionaryCount++;
-
-                    // Add dictionary for each locale
-                    for (String locale : entry.getLocales()) {
-                        dictionaries.put(locale, dict);
-                        localeCount++;
+                String hyphen = entry.getHyphen();
+                for (String locale : entry.getLocales()) {
+                    String normalizedLocale = normalizeLocale(locale);
+                    if (normalizedLocale == null) {
+                        continue;
                     }
-                } catch (IOException e) {
-                    logger.warn("Failed to load dictionary: {}", resourcePath, e);
+                    resources.put(normalizedLocale, new DictionaryResource(resourcePath, hyphen));
+                    localeCount++;
                 }
             }
 
-            logger.info("Loaded {} dictionaries for {} locales", dictionaryCount, localeCount);
+            logger.info("Registered {} locales for lazy dictionary loading", localeCount);
+            return resources;
+        } catch (IOException e) {
+            throw new RuntimeException(e);
         }
     }
 
@@ -155,7 +191,62 @@ public class Hypherator {
     }
 
     protected HyphenDict getDictionary(String locale) {
-        return dictionaries.get(locale);
+        return getOrLoadDictionary(locale);
     }
 
+    private static HyphenDict getOrLoadDictionary(String locale) {
+        String normalizedLocale = normalizeLocale(locale);
+        if (normalizedLocale == null) {
+            return null;
+        }
+
+        DictionaryResource resource = dictionaryResources.get(normalizedLocale);
+        if (resource == null) {
+            return null;
+        }
+
+        return dictionaries.computeIfAbsent(normalizedLocale, ignored -> {
+            try {
+                logger.info("Loading dictionary: {} ({})", resource.resourcePath(), normalizedLocale);
+                HyphenDict dict = loadDictionaryFromResource(resource.resourcePath());
+                dict.hyphen = resource.hyphen();
+                return dict;
+            } catch (IOException e) {
+                logger.warn("Failed to load dictionary: {}", resource.resourcePath(), e);
+                return null;
+            }
+        });
+    }
+
+    private static String normalizeLocale(String locale) {
+        if (locale == null || locale.isBlank()) {
+            return null;
+        }
+        return locale.replace('_', '-');
+    }
+
+    private static HyphenationCandidate toCandidate(io.sevcik.hypherator.dto.PotentialBreak potentialBreak) {
+        PotentialBreakImpl breakImpl = (PotentialBreakImpl) potentialBreak;
+        HyphenDict.BreakRule breakRule = breakImpl.breakRule();
+        return new HyphenationCandidate(
+                breakImpl.position(),
+                breakImpl.priority(),
+                breakRule != null ? breakRule.getReplacement() : null,
+                breakRule != null ? breakRule.getReplacementIndex() : 0,
+                breakRule != null ? breakRule.getReplacementCount() : 0);
+    }
+
+    private static PotentialBreakImpl fromCandidate(HyphenationCandidate candidate) {
+        HyphenDict.BreakRule breakRule = new HyphenDict.BreakRule()
+                .setValue(candidate.priority());
+        if (candidate.hasReplacement()) {
+            breakRule.setReplacement(candidate.replacement())
+                    .setReplacementIndex(candidate.replacementIndex())
+                    .setReplacementCount(candidate.replacementCount());
+        }
+        return new PotentialBreakImpl(candidate.logicalOffset(), candidate.priority(), breakRule);
+    }
+
+    private record DictionaryResource(String resourcePath, String hyphen) {
+    }
 }

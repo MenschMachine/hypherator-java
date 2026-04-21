@@ -387,7 +387,7 @@ public class DictionariesProcessor {
     public static void main(String[] args) {
         System.out.println("Hypherator Dictionaries Processor");
         System.out.println("Current path: " + System.getProperty("user.dir"));
-        if (args.length != 3) {
+        if (args.length != 4) {
             args = List.of("dictionaries", "indic_dictionaries", "hypherator/src/main/resources/3pp_licenses", "hypherator/src/main/resources/hyphen").toArray(new String[0]);
             //System.err.println("Usage: DictionariesProcessor <sourceDirectory> <licenseDirectory> <hyphenDirectory>");
             //System.exit(1);

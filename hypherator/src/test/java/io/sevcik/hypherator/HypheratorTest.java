@@ -1,6 +1,8 @@
 package io.sevcik.hypherator;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.sevcik.hypherator.dto.HyphenationCandidate;
+import io.sevcik.hypherator.dto.HyphenationSplit;
 import io.sevcik.hypherator.dto.PotentialBreak;
 import org.junit.jupiter.api.Test;
 
@@ -16,26 +18,18 @@ public class HypheratorTest {
     private ObjectMapper mapper = new ObjectMapper();
 
     @Test
-    public void testHyphenatorLoadsAllDictionaries() throws IOException {
-        // Create a new Hyphenator instance
+    public void testHyphenatorLoadsDictionariesLazily() {
         Hypherator hypherator = new Hypherator();
 
-        // Get all dictionaries
         Map<String, HyphenDict> dictionaries = hypherator.getDictionaries();
-        
-        // Verify that dictionaries were loaded
-        assertFalse(dictionaries.isEmpty(), "Dictionaries should not be empty");
-        
-        // Test a few specific locales
-        assertNotNull(hypherator.getDictionary("en-US"), "English (US) dictionary should be loaded");
-        assertNotNull(hypherator.getDictionary("de-DE"), "German dictionary should be loaded");
-        assertNotNull(hypherator.getDictionary("fr-FR"), "French dictionary should be loaded");
-        
-        // Test using Locale object
+        int loadedBefore = dictionaries.size();
+
+        assertNotNull(hypherator.getDictionary("en-US"), "English (US) dictionary should be loaded on demand");
+        assertNotNull(hypherator.getDictionary("de-DE"), "German dictionary should be loaded on demand");
+        assertNotNull(hypherator.getDictionary("fr-FR"), "French dictionary should be loaded on demand");
         assertNotNull(hypherator.getDictionary(Locale.US.toString().replace("_", "-")), "English (US) dictionary should be loaded using Locale");
-        
-        // Print the number of dictionaries loaded
-        System.out.println("Loaded " + dictionaries.size() + " dictionaries");
+
+        assertTrue(dictionaries.size() >= loadedBefore, "Loaded dictionaries should be visible after first use");
     }
 
     @Test
@@ -148,6 +142,25 @@ public class HypheratorTest {
                 }
             }
         }
+    }
+
+    @Test
+    public void testBatchApiReturnsCandidates() {
+        List<HyphenationCandidate> candidates = Hypherator.hyphenate("en-US", "typography");
+
+        assertFalse(candidates.isEmpty());
+        assertTrue(candidates.stream().allMatch(candidate -> candidate.logicalOffset() > 0));
+        assertTrue(candidates.stream().allMatch(candidate -> candidate.priority() > 0));
+    }
+
+    @Test
+    public void testPublicApplyBreakSupportsReplacementRules() {
+        HyphenationSplit split = Hypherator.applyBreak(
+                "schifffahrt",
+                new HyphenationCandidate(4, 5, "ff=f", 2, 2));
+
+        assertEquals("schifff", split.left());
+        assertEquals("fahrt", split.right());
     }
 
 

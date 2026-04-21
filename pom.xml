@@ -4,9 +4,9 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>io.sevcik</groupId>
+    <groupId>com.tfc.pdfdancer</groupId>
     <artifactId>hypherator-parent</artifactId>
-    <version>1.1</version>
+    <version>1.1.0-pdfdancer.1</version>
     <packaging>pom</packaging>
     <name>Hyphenation iterator</name>
     <licenses>
@@ -17,8 +17,8 @@
         </license>
     </licenses>
     <scm>
-        <url>https://github.com/ejossev/hypherator</url>
-        <connection>scm:git:https://github.com/ejossev/hypherator.git</connection>
+        <url>https://github.com/MenschMachine/hypherator-java</url>
+        <connection>scm:git:https://github.com/MenschMachine/hypherator-java.git</connection>
     </scm>
     <developers>
         <developer>

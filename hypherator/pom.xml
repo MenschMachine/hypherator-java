@@ -3,13 +3,16 @@
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
-    <groupId>io.sevcik</groupId>
+    <parent>
+        <groupId>com.tfc.pdfdancer</groupId>
+        <artifactId>hypherator-parent</artifactId>
+        <version>1.1.0-pdfdancer.1</version>
+    </parent>
     <artifactId>hypherator</artifactId>
-    <version>1.1</version>
     <packaging>jar</packaging>
     <name>Hypherator - Hyphenation iterator</name>
     <description>Java hyphenation library with an iterator interface similar to ICU4J. Includes hyphen dictionaries for multiple languages.</description>
-    <url>https://github.com/ejossev/hypherator</url>
+    <url>https://github.com/MenschMachine/hypherator-java</url>
 
     <licenses>
         <license>
@@ -20,8 +23,8 @@
     </licenses>
 
     <scm>
-        <url>https://github.com/ejossev/hypherator</url>
-        <connection>scm:git:https://github.com/ejossev/hypherator.git</connection>
+        <url>https://github.com/MenschMachine/hypherator-java</url>
+        <connection>scm:git:https://github.com/MenschMachine/hypherator-java.git</connection>
     </scm>
 
     <developers>
@@ -98,29 +101,6 @@
                         </goals>
                     </execution>
                 </executions>
-            </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-gpg-plugin</artifactId>
-                <version>3.2.7</version>
-                <executions>
-                    <execution>
-                        <id>sign-artifacts</id>
-                        <phase>verify</phase>
-                        <goals>
-                            <goal>sign</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
-            <plugin>
-                <groupId>org.sonatype.central</groupId>
-                <artifactId>central-publishing-maven-plugin</artifactId>
-                <version>0.7.0</version>
-                <extensions>true</extensions>
-                <configuration>
-                    <publishingServerId>central</publishingServerId>
-                </configuration>
             </plugin>
         </plugins>
     </build>
