@@ -1,10 +1,12 @@
 package io.sevcik.hypherator;
 
 import io.sevcik.hypherator.dto.Pair;
+import io.sevcik.hypherator.dto.HyphenationCandidateKind;
 import io.sevcik.hypherator.dto.PotentialBreak;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 import static java.lang.Math.max;
 import static java.lang.Math.min;
@@ -41,7 +43,11 @@ class HyphenateImpl implements Hyphenate {
                 continue;
             }
             // TODO: take into account the current break rule and calculate if there is shift in the right part.
-            result.add(new PotentialBreakImpl(potentialBreakImpl.position() - breakPositionImpl.position(), potentialBreakImpl.priority(), potentialBreakImpl.breakRule()));
+            result.add(new PotentialBreakImpl(
+                    potentialBreakImpl.position() - breakPositionImpl.position(),
+                    potentialBreakImpl.priority(),
+                    potentialBreakImpl.breakRule(),
+                    potentialBreakImpl.kind()));
         }
         cleanBreaksAtEdges(dict, rightPart, result);
         return result;
@@ -49,7 +55,10 @@ class HyphenateImpl implements Hyphenate {
 
     @Override
     public List<PotentialBreak> hyphenate(HyphenDict dict, String text) {
-        List<PotentialBreak> possibleBreaks = applyStandardRules(dict, text, true, true);
+        HyphenationCandidateKind initialKind = dict.nextLevel != null
+                ? HyphenationCandidateKind.COMPOUND
+                : HyphenationCandidateKind.STANDARD;
+        List<PotentialBreak> possibleBreaks = applyStandardRules(dict, text, true, true, initialKind);
         applyNohyphenRules(dict, text, possibleBreaks);
         // apply rules for not breaking too close to the word ends
         cleanBreaksAtEdges(dict, text, possibleBreaks);
@@ -111,8 +120,13 @@ class HyphenateImpl implements Hyphenate {
 
 
 
-    private List<PotentialBreak> applyStandardRules(HyphenDict dict, String text, boolean isWordLeftEnd, boolean isWordRightEnd) {
-        text = "." + text.replaceAll("\\d", ".") + ".";
+    private List<PotentialBreak> applyStandardRules(
+            HyphenDict dict,
+            String text,
+            boolean isWordLeftEnd,
+            boolean isWordRightEnd,
+            HyphenationCandidateKind kind) {
+        text = normalizeForMatching(text);
         Pair<Integer, HyphenDict.BreakRule>[] potentialBreaks = new Pair[text.length()];
         for (int i = 0; i < potentialBreaks.length; i++) {
             potentialBreaks[i] = new Pair<>(0, null);
@@ -125,7 +139,12 @@ class HyphenateImpl implements Hyphenate {
             for (int i = 2; i <= potentialBreaks.length - 1; i++) {
                 if (i == potentialBreaks.length - 1 && lastBreakPosition == 1) {
                     // We cannot further split this word using compound rules - the word is not compount anymore, apply nextlevel rules
-                    var newBreaks = applyStandardRules(dict.nextLevel, text.substring(1, text.length() - 1), isWordLeftEnd, isWordRightEnd);
+                    var newBreaks = applyStandardRules(
+                            dict.nextLevel,
+                            text.substring(1, text.length() - 1),
+                            isWordLeftEnd,
+                            isWordRightEnd,
+                            HyphenationCandidateKind.STANDARD);
                     mergeBreakList(newBreaks, lastBreakPosition, potentialBreaks);
                     applyBorderRules(potentialBreaks, dict.leftCompoundMin, dict.rightCompoundMin, isWordLeftEnd, isWordRightEnd);
                 } else if (((potentialBreaks[i].getFirst() % 2 == 1) || (i == potentialBreaks.length - 1))) {
@@ -142,7 +161,12 @@ class HyphenateImpl implements Hyphenate {
                                 (previousBreak.replacementIndex + previousBreak.replacementCount - 1) - replacementRight.length();
                     }
 
-                    var newBreaks = applyStandardRules(dict, segment, i == 1 && isWordLeftEnd, i == potentialBreaks.length - 1 && isWordRightEnd);
+                    var newBreaks = applyStandardRules(
+                            dict,
+                            segment,
+                            i == 1 && isWordLeftEnd,
+                            i == potentialBreaks.length - 1 && isWordRightEnd,
+                            HyphenationCandidateKind.COMPOUND);
                     mergeBreakList(newBreaks, lastBreakPosition + segmentOffsetAfterReplacement, potentialBreaks);
                     lastBreakPosition = i;
                 }
@@ -152,7 +176,7 @@ class HyphenateImpl implements Hyphenate {
         List<PotentialBreak> result = new ArrayList<>();
         for (int i = 1; i < potentialBreaks.length; i++) {
             if (potentialBreaks[i].getFirst() % 2 == 1) {
-                result.add(new PotentialBreakImpl(i-1, potentialBreaks[i].getFirst(), potentialBreaks[i].getSecond()));
+                result.add(new PotentialBreakImpl(i - 1, potentialBreaks[i].getFirst(), potentialBreaks[i].getSecond(), kind));
             }
         }
         return result;
@@ -179,10 +203,11 @@ class HyphenateImpl implements Hyphenate {
     }
 
     private void applyRulesFromDict(HyphenDict dict, String text, Pair<Integer, HyphenDict.BreakRule>[] breakCandidates) {
+        String lowercaseText = text.toLowerCase(Locale.ROOT);
         int textLength = text.length();
         for (int start = 0; start < textLength - 1; start++) {
             for (int end = start + 1; end <= textLength; end++) {
-                String toMatch = text.substring(start, end).toLowerCase();
+                String toMatch = lowercaseText.substring(start, end);
                 if (dict.rules.containsKey(toMatch)) {
                     for (var breakRuleEntry : dict.rules.get(toMatch).getBreakRules().entrySet()) {
                         int breakPosition = start + breakRuleEntry.getKey();
@@ -212,6 +237,17 @@ class HyphenateImpl implements Hyphenate {
                 potentialBreaks[i].setSecond(null);
             }
         }
+    }
+
+    private String normalizeForMatching(String text) {
+        StringBuilder normalized = new StringBuilder(text.length() + 2);
+        normalized.append('.');
+        for (int i = 0; i < text.length(); i++) {
+            char current = text.charAt(i);
+            normalized.append(Character.isDigit(current) ? '.' : current);
+        }
+        normalized.append('.');
+        return normalized.toString();
     }
 
 

@@ -2,6 +2,7 @@ package io.sevcik.hypherator;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.sevcik.hypherator.dto.HyphenationCandidate;
+import io.sevcik.hypherator.dto.HyphenationCandidateKind;
 import io.sevcik.hypherator.dto.HyphenationSplit;
 import io.sevcik.hypherator.dto.PotentialBreak;
 import org.junit.jupiter.api.Test;
@@ -151,16 +152,25 @@ public class HypheratorTest {
         assertFalse(candidates.isEmpty());
         assertTrue(candidates.stream().allMatch(candidate -> candidate.logicalOffset() > 0));
         assertTrue(candidates.stream().allMatch(candidate -> candidate.priority() > 0));
+        assertTrue(candidates.stream().allMatch(candidate -> candidate.kind() != null));
     }
 
     @Test
     public void testPublicApplyBreakSupportsReplacementRules() {
         HyphenationSplit split = Hypherator.applyBreak(
                 "schifffahrt",
-                new HyphenationCandidate(4, 5, "ff=f", 2, 2));
+                new HyphenationCandidate(4, 5, "ff=f", 2, 2, HyphenationCandidateKind.STANDARD));
 
         assertEquals("schifff", split.left());
         assertEquals("fahrt", split.right());
+    }
+
+    @Test
+    public void testBatchApiExposesCompoundCandidates() {
+        List<HyphenationCandidate> candidates = Hypherator.hyphenate("de-DE", "Donaudampfschiffahrt");
+
+        assertFalse(candidates.isEmpty());
+        assertTrue(candidates.stream().anyMatch(candidate -> candidate.kind() == HyphenationCandidateKind.COMPOUND));
     }
 
 

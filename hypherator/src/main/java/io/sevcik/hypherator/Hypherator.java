@@ -8,6 +8,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import io.sevcik.hypherator.dto.DictionaryEntry;
 import io.sevcik.hypherator.dto.HyphenationCandidate;
+import io.sevcik.hypherator.dto.HyphenationCandidateKind;
 import io.sevcik.hypherator.dto.HyphenationSplit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -233,7 +234,8 @@ public class Hypherator {
                 breakImpl.priority(),
                 breakRule != null ? breakRule.getReplacement() : null,
                 breakRule != null ? breakRule.getReplacementIndex() : 0,
-                breakRule != null ? breakRule.getReplacementCount() : 0);
+                breakRule != null ? breakRule.getReplacementCount() : 0,
+                breakImpl.kind());
     }
 
     private static PotentialBreakImpl fromCandidate(HyphenationCandidate candidate) {
@@ -244,7 +246,11 @@ public class Hypherator {
                     .setReplacementIndex(candidate.replacementIndex())
                     .setReplacementCount(candidate.replacementCount());
         }
-        return new PotentialBreakImpl(candidate.logicalOffset(), candidate.priority(), breakRule);
+        return new PotentialBreakImpl(
+                candidate.logicalOffset(),
+                candidate.priority(),
+                breakRule,
+                candidate.kind() != null ? candidate.kind() : HyphenationCandidateKind.STANDARD);
     }
 
     private record DictionaryResource(String resourcePath, String hyphen) {

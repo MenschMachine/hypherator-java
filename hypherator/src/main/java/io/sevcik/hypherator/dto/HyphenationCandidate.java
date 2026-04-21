@@ -8,13 +8,15 @@ package io.sevcik.hypherator.dto;
  * @param replacement replacement rule payload, or null when the breakpoint is a plain split
  * @param replacementIndex replacement rule start index as defined by the dictionary format
  * @param replacementCount replacement rule count as defined by the dictionary format
+ * @param kind high-level breakpoint category
  */
 public record HyphenationCandidate(
         int logicalOffset,
         int priority,
         String replacement,
         int replacementIndex,
-        int replacementCount
+        int replacementCount,
+        HyphenationCandidateKind kind
 ) {
 
     public boolean hasReplacement() {
