@@ -36,3 +36,4 @@ build/
 
 ### Mac OS ###
 .DS_Store
+/hypherator/src/main/resources/hyphen/all.json
